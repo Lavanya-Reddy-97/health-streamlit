@@ -65,7 +65,7 @@ df['Health_Index_%'] = 100 - (df['Risk_Score'] / max_score * 100)
 
 # --- RISK CATEGORY FUNCTION ---
 def risk_category(health_idx):
-    if health_idx > 60:
+    if health_idx > 50:
         return 'Low Risk'
     elif health_idx > 40:
         return 'Moderate Risk'
