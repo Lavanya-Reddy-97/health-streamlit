@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import joblib
 
-# Load model and label encoder, plus combined_scale dict from your training session
+# Load model and artifacts
 model = joblib.load('mental_health_model.joblib')
 le = joblib.load('label_encoder.joblib')
 combined_scale = joblib.load('combined_scale.joblib')
@@ -11,8 +11,7 @@ combined_scale = joblib.load('combined_scale.joblib')
 st.set_page_config(page_title="Student Mental Health Self-Assessment", layout="centered")
 st.title("📝 Student Mental Health Self-Assessment")
 
-# Define all questions with their appropriate options grouped by section
-
+# Questions grouped by category with options
 question_sections = {
     "Personal and Social Well-being": [
         ("I am able to quickly adapt to changes in life", ["Always", "Often", "Sometimes", "Rarely", "Never"]),
@@ -48,8 +47,9 @@ question_sections = {
     "Academic Satisfaction and Anxiety": [
         ("I am satisfied with my academic performance", ["Always", "Often", "Sometimes", "Rarely", "Never"]),
         ("I am able to submit my assignments on time", ["Always", "Often", "Sometimes", "Rarely", "Never"]),
-        ("What prevents you from doing well academically? (Select all that apply)", ["Lack of concentration", "Poor study habits", "Difficulty managing time", "Distractions", "Difficulty understanding content", "Other"]),  # Multi-select not handled as numeric; skip or handle specially
-        ("I feel anxious due to: (Select all that apply)", ["Studies", "Exams", "Results", "College admissions", "Career", "I don’t feel anxious", "Other"]),  # Multi-select, same note
+        # The following multi-select questions will be handled as multi-select UI below
+        ("What prevents you from doing well academically? (Select all that apply)", ["Lack of concentration", "Poor study habits", "Difficulty managing time", "Distractions", "Difficulty understanding content", "Other"]),
+        ("I feel anxious due to: (Select all that apply)", ["Studies", "Exams", "Results", "College admissions", "Career", "I don’t feel anxious", "Other"]),
         ("I feel valued when I perform well academically", ["Yes", "No"]),
         ("I get bothered when teachers don’t notice my efforts", ["Yes", "No", "Neither"]),
         ("I feel like I don’t belong or fit in at school", ["Yes", "No", "Neither"]),
@@ -58,7 +58,7 @@ question_sections = {
     ],
     "Online Learning Experience": [
         ("I find online classes better than offline classes", ["Yes", "No", "Maybe"]),
-        ("What challenges did you face during online classes? (Select all that apply)", ["Difficulty understanding content", "Technical issues", "Lack of time management", "Electricity/internet problems", "Personal reasons", "Lack of social interaction", "Other"])  # Multi-select, special case
+        ("What challenges did you face during online classes? (Select all that apply)", ["Difficulty understanding content", "Technical issues", "Lack of time management", "Electricity/internet problems", "Personal reasons", "Lack of social interaction", "Other"])
     ],
     "Emotional Well-being": [
         ("I often feel happy", ["Always", "Sometimes", "Often", "Rarely", "Never"]),
@@ -72,10 +72,10 @@ question_sections = {
         ("I have trouble following rules or instructions", ["Yes", "No"])
     ],
     "Coping and Support Strategies": [
-        ("When feeling low, I prefer: (Select all that apply)", ["Talking to friends", "Talking to parents", "Talking to teachers", "Solving on my own", "Ignoring the feelings", "Waiting for things to improve", "Other"]),  # Multi-select special
+        ("When feeling low, I prefer: (Select all that apply)", ["Talking to friends", "Talking to parents", "Talking to teachers", "Solving on my own", "Ignoring the feelings", "Waiting for things to improve", "Other"]),
         ("I believe I can solve challenging tasks", ["Yes", "No"]),
         ("I have people I can talk to about my feelings", ["Yes", "No"]),
-        ("I usually cope with stress by: (Select all that apply)", ["Yoga or meditation", "Changing the way I think", "Writing a diary", "Watching TV", "Helping others", "Other"])  # Multi-select special
+        ("I usually cope with stress by: (Select all that apply)", ["Yoga or meditation", "Changing the way I think", "Writing a diary", "Watching TV", "Helping others", "Other"])
     ],
     "Eating Habits & Body Image": [
         ("I feel satisfied with my eating habits", ["Always", "Often", "Sometimes", "Rarely", "Never"]),
@@ -86,8 +86,7 @@ question_sections = {
         ("I worry excessively about gaining weight", ["Always", "Often", "Sometimes", "Rarely", "Never"]),
         ("I feel pressure to look a certain way because of social media or peers", ["Always", "Often", "Sometimes", "Rarely", "Never"]),
         ("I restrict food intake to control my weight", ["Always", "Often", "Sometimes", "Rarely", "Never"]),
-        ("Do you think your eating habits affect your emotional or physical well-being?", ["Yes", "No", "Not Sure"]),
-        # Note: Follow-up multi-select question omitted as it needs complex UI
+        ("Do you think your eating habits affect your emotional or physical well-being?", ["Yes", "No", "Not Sure"])
     ],
     "Mental Health and Emotional Safety": [
         ("I feel overwhelmed by my emotions", ["Always", "Often", "Sometimes", "Rarely", "Never", "Skip"]),
@@ -113,33 +112,34 @@ question_sections = {
     ]
 }
 
-# --- Begin UI ---
-
+# Render the form
 with st.form("assessment_form"):
     responses = {}
-    for section, qs in question_sections.items():
+    for section, questions in question_sections.items():
         with st.expander(section, expanded=False):
-            for q, opts in qs:
-                if "Select all that apply" in q or len(opts) > 5 and section in ["Coping and Support Strategies", "Academic Satisfaction and Anxiety", "Online Learning Experience"]:
-                    # Multi-select special cases (skip for scoring or handle differently)
-                    responses[q] = st.multiselect(q, opts, key=q)
-                elif section == "Risky Activities":
-                    responses[q] = st.multiselect(q, opts, key=q)
+            for q, options in questions:
+                # Add "Choose an option" placeholder for single-select
+                if "Select all that apply" in q or section in ["Coping and Support Strategies", "Academic Satisfaction and Anxiety", "Online Learning Experience", "Risky Activities"]:
+                    # Multi-select questions
+                    responses[q] = st.multiselect(q, options, key=q)
                 else:
-                    responses[q] = st.selectbox(q, opts, key=q)
+                    options_with_placeholder = ["Choose an option"] + options
+                    responses[q] = st.selectbox(q, options_with_placeholder, index=0, key=q)
 
     submitted = st.form_submit_button("Submit")
 
 if submitted:
-    # For multi-select responses, skip or encode as zero (could be improved)
     numeric_vals = []
     for question, answer in responses.items():
         if isinstance(answer, list):
-            # Multi-select: count number of selections as risk factor (or zero if none)
+            # Multi-select: score is number of selections (or 0 if none)
             numeric_vals.append(len(answer) if answer else 0)
         else:
-            # Map to combined_scale; fallback 0
-            numeric_vals.append(combined_scale.get(answer, 0))
+            # Handle placeholder as zero score
+            if answer == "Choose an option":
+                numeric_vals.append(0)
+            else:
+                numeric_vals.append(combined_scale.get(answer, 0))
 
     df_input = pd.DataFrame([numeric_vals], columns=responses.keys()).fillna(0)
 
