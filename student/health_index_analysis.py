@@ -44,9 +44,9 @@ df['Health_Index_%'] = 100 - (df['Risk_Score'] / max_possible_score * 100)
 
 # STEP 7: Categorize into risk levels
 def categorize_risk(health_index):
-    if health_index > 75:
+    if health_index > 50:
         return 'Low Risk'
-    elif health_index > 50:
+    elif health_index > 25:
         return 'Moderate Risk'
     else:
         return 'High Risk'
