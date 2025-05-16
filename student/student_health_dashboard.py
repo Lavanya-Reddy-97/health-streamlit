@@ -49,9 +49,9 @@ max_score = len(valid_cols) * 4
 df['Health_Index_%'] = 100 - (df['Risk_Score'] / max_score * 100)
 
 def risk_category(score):
-    if score > 70:
+    if score > 60:
         return 'Low Risk'
-    elif score > 50:
+    elif score > 40:
         return 'Moderate Risk'
     else:
         return 'High Risk'
