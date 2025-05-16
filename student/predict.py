@@ -6,68 +6,105 @@ import joblib
 # Load saved artifacts
 model = joblib.load('mental_health_model.joblib')
 le = joblib.load('label_encoder.joblib')
-valid_cols = joblib.load('valid_cols.joblib')
 combined_scale = joblib.load('combined_scale.joblib')
 
-# Define question sections
+# Define sections and questions
 question_sections = {
-    "Academic Pressure": [
-        "I feel overwhelmed by my coursework.",
-        "I struggle to meet academic deadlines."
+    "Personal and Social Well-being": [
+        "I am able to quickly adapt to changes in life",
+        "I feel accepted by my peers",
+        "I feel comfortable expressing myself with others"
     ],
-    "Social Life": [
-        "I find it hard to make new friends.",
-        "I feel isolated from my peers."
+    "ADHD Symptoms & Behavior": [
+        "I have trouble focusing during lectures or study time",
+        "I often act impulsively without thinking",
+        "I feel the need to constantly move or fidget"
     ],
-    "Family Expectations": [
-        "My family's expectations cause me stress.",
-        "I fear disappointing my family."
+    "Academic Satisfaction and Anxiety": [
+        "I feel overwhelmed by my coursework",
+        "I struggle to meet academic deadlines",
+        "I am satisfied with my academic performance"
     ],
-    "Personal Well-being": [
-        "I often feel anxious or depressed.",
-        "I have trouble sleeping due to stress."
+    "Online Learning Experience": [
+        "I find it easy to learn through online classes",
+        "I stay engaged during virtual sessions",
+        "I miss in-person interaction with teachers and peers"
+    ],
+    "Emotional Well-being": [
+        "I often feel sad or down",
+        "I feel anxious without clear reason",
+        "I feel hopeful about my future"
+    ],
+    "Coping and Support Strategies": [
+        "I know where to go when I need help",
+        "I use healthy ways to cope with stress",
+        "I feel supported by my school community"
+    ],
+    "Eating Habits & Body Image": [
+        "I have a healthy relationship with food",
+        "I feel confident about my body image",
+        "I skip meals regularly"
+    ],
+    "Mental Health and Emotional Safety": [
+        "I have thoughts of hurting myself",
+        "I find it difficult to share my feelings with others",
+        "I feel emotionally safe at school"
+    ],
+    "Risky Activities": [
+        "I take part in risky activities"
     ]
 }
 
-# Prepare response options (exclude nan if present)
-response_options = sorted([k for k in combined_scale.keys() if pd.notna(k)])
+# Define custom options per section
+category_options = {
+    "Risky Activities": [
+        "None",
+        "Skipping classes",
+        "Bullying or getting into fights",
+        "Engaging in unsafe actions (e.g., reckless behavior)",
+        "Experimenting with substances"
+    ]
+}
 
+# Default Likert-style options for other categories
+likert_options = ["Always", "Often", "Sometimes", "Rarely", "Never"]
+
+# Build UI
 st.set_page_config(page_title="Student Mental Health Self-Assessment", layout="centered")
 st.title("📝 Student Mental Health Self-Assessment")
 
-# Create a form for user input
 with st.form(key='assessment_form'):
     responses = {}
 
     for section, questions in question_sections.items():
-        with st.expander(section):
+        with st.expander(f"{section}"):
             for q in questions:
-                responses[q] = st.selectbox(q, response_options, key=q)
+                options = category_options.get(section, likert_options)
+                responses[q] = st.selectbox(q, options, key=q)
 
-    submit_button = st.form_submit_button(label='Submit')
+    submit = st.form_submit_button("Submit")
 
-if submit_button:
-    # Map responses to numeric scores, default to 0 if unknown
-    numeric_responses = [combined_scale.get(res, 0) for res in responses.values()]
+if submit:
+    # Map responses to numeric values using combined_scale
+    numeric_responses = [combined_scale.get(val, 0) for val in responses.values()]
     df_input = pd.DataFrame([numeric_responses], columns=responses.keys()).fillna(0)
 
-    # Calculate risk score and health index
+    # Health calculation
     risk_score = df_input.sum(axis=1).values[0]
     max_score = len(responses) * 4
     health_index = 100 - (risk_score / max_score * 100)
 
-    # Predict risk category
+    # Predict risk
     predicted_label_encoded = model.predict(df_input)[0]
-    predicted_risk_category = le.inverse_transform([predicted_label_encoded])[0]
+    predicted_risk = le.inverse_transform([predicted_label_encoded])[0]
 
-    # Show results
+    # Display results
     st.markdown(f"### 🧠 Your Health Index: `{health_index:.2f}%`")
-    st.markdown(f"### 📊 Predicted Risk Category: **{predicted_risk_category}**")
+    st.markdown(f"### 📊 Predicted Risk Category: **{predicted_risk}**")
 
-    # Optional: Add visual feedback
     if health_index > 80:
-        st.success("Great job! Your mental health appears to be in good shape.")
+        st.success("✅ Great job! Your mental health appears to be in good shape.")
     elif health_index > 50:
-        st.warning("Caution: There are some areas to watch. Consider seeking support.")
+        st.warning("⚠️ You may be experiencing some challenges. Consider seeking support.")
     else:
-        st.error("Alert: Your responses indicate potential mental health risks. Please consult a professional.")
+        st.error("🚨 Your responses indicate a higher risk. Please reach out to a counselor or mental health professional.")
